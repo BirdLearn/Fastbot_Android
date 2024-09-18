@@ -28,6 +28,8 @@ namespace fastbotx {
         this->_text = opt._text;
         this->extra0 = opt.extra0;
         this->name = opt.name;
+        this->editable = opt.editable;
+        LOGW("XXXXXXXXXXXXXXXXXXXX DeviceOperateWrapper opt.editable %d", opt.editable);
     }
 
     DeviceOperateWrapper &DeviceOperateWrapper::operator=(const DeviceOperateWrapper &opt) {
@@ -40,6 +42,8 @@ namespace fastbotx {
         this->_text = opt._text;
         this->extra0 = opt.extra0;
         this->name = opt.name;
+        this->editable = opt.editable;
+        LOGW("XXXXXXXXXXXXXXXXXXXX DeviceOperateWrapper opt.editable %d", opt.editable);
         return *this;
     }
 
@@ -49,7 +53,7 @@ namespace fastbotx {
             this->_text = this->_text.substr(0, 999);
         }
         if (!this->editable) {
-            LOGW("set text to a none editable node %s", this->toString().c_str());
+            LOGW("XXXXXXXXXXXXXXXXXXXX set text to a none editable node %s", this->toString().c_str());
         }
         return this->_text;
     }
@@ -86,6 +90,7 @@ namespace fastbotx {
             this->throttle = static_cast<float>(getJsonValue<int>(retJson, "throttle", 0));
             this->adbInput = getJsonValue<bool>(retJson, "adb_input", false);
             this->waitTime = getJsonValue<int>(retJson, "wait_time", 0);
+            this->editable = getJsonValue<bool>(retJson, "editable", false);
         }
         catch (nlohmann::json::exception &e) // may some char encoding error
         {

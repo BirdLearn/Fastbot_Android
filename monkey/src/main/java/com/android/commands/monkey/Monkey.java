@@ -75,6 +75,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 
@@ -360,6 +361,9 @@ public class Monkey {
      * use fastbot-native reuse nq algorithmic decision
      */
     private boolean mUseApeNativeReuse;
+
+
+    private String[] mUseApeNativBlockActions;
 
     /**
      * outputdir for test result
@@ -777,6 +781,8 @@ public class Monkey {
             mEventSource = new MonkeySourceApeNative(mRandom, mMainApps, mThrottle, mRandomizeThrottle, mPermissionTargetSystem, mOutputDirectory);
             mEventSource.setVerbose(mVerbose);
 
+            ((MonkeySourceApeNative) mEventSource).setBlockActions(mUseApeNativBlockActions);
+
             // grant all permissions required, enabled by default
             if (grantAllPermission) {
                 ((MonkeySourceApeNative) mEventSource).grantRuntimePermissions("GrantPermissionsActivity");
@@ -982,6 +988,12 @@ public class Monkey {
                         String agentType = nextOptionData();
                         if ("reuseq".equals(agentType)) {
                             mUseApeNativeReuse = true;
+                        }
+                        break;
+                    case "--block-actions":
+                        String actionsData = nextOptionData();
+                        if (!Objects.equals(actionsData, "") && actionsData !=null){
+                            mUseApeNativBlockActions = actionsData.split(",");
                         }
                         break;
                     case "--replay-log":

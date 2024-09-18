@@ -131,9 +131,9 @@ namespace fastbotx {
                 startIndex = endIndex + 1;
             }
         }
-        for (auto it: strings) {
-            BLOG("The content of XML is: %s", it.c_str());
-        }
+        // for (auto it: strings) {
+        //     BLOG("The content of XML is: %s", it.c_str());
+        // }
         tinyxml2::XMLError errXml = doc.Parse(xmlContent.c_str());
 
         if (errXml != tinyxml2::XML_SUCCESS) {
@@ -183,9 +183,8 @@ namespace fastbotx {
     }
 
     void Element::recursiveToXML(tinyxml2::XMLElement *xml, const Element *elm) const {
-        BDLOG("add a xml %p %p", xml, elm);
+        // BDLOG("add a xml %p %p", xml, elm);
         xml->SetAttribute("bounds", elm->getBounds()->toString().c_str());
-        BDLOG("add a xml 111");
         xml->SetAttribute("index", elm->getIndex());
         xml->SetAttribute("class", elm->getClassname().c_str());
         xml->SetAttribute("resource-id", elm->getResourceID().c_str());
@@ -201,8 +200,6 @@ namespace fastbotx {
         xml->SetAttribute("long-clickable", elm->_longClickable ? "true" : "false");
         xml->SetAttribute("password", elm->_password ? "true" : "false");
         xml->SetAttribute("scroll-type", "none");
-
-        BDLOG("add a xml 1111");
         for (const auto &child: elm->getChildren()) {
             tinyxml2::XMLElement *xmlChild = xml->InsertNewChildElement("node");
             xml->LinkEndChild(xmlChild);

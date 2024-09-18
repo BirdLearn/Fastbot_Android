@@ -30,7 +30,7 @@ namespace fastbotx {
         OperatePtr opt = Action::toOperate();
         opt->sid = "customact";
         opt->aid = "customact";
-        opt->editable = true;
+        opt->editable = this->editable;
         opt->setText(this->text);
         if (this->bounds.size() >= 4) {
             opt->pos = Rect(static_cast<int>(this->bounds[0]), static_cast<int>(this->bounds[1]),
@@ -147,8 +147,12 @@ namespace fastbotx {
             BLOG("check custom action queue");
             auto frontAction = this->_currentActions.front();
             this->_currentActions.pop();
+            BLOG("frontAction->getActionType() is %d", frontAction->getActionType());
+            BLOG("ActionType::CLICK is %d", ActionType::CLICK);
+            BLOG("ActionType::SCROLL_RIGHT_LEFT is %d", ActionType::SCROLL_RIGHT_LEFT);
+            
             if (frontAction->getActionType() >= ActionType::CLICK &&
-                frontAction->getActionType() <= ActionType::SCROLL_RIGHT_LEFT) {
+                frontAction->getActionType() <= ActionType::SHELL_EVENT) {
                 // android action type
                 auto customAction = std::dynamic_pointer_cast<CustomAction>(frontAction);
                 if (rootXML && !this->patchActionBounds(customAction, rootXML)) {
@@ -195,6 +199,8 @@ namespace fastbotx {
         std::srand((unsigned int) std::time(nullptr));
         if (opt->editable && opt->getText().empty()
             && (opt->act == ActionType::CLICK || opt->act == ActionType::LONG_CLICK)) {
+            BLOG("this->_randomInputText: %d, this->_inputTexts.size: %d",
+                 this->_randomInputText, this->_inputTexts.size());
             if (this->_randomInputText &&
                 this->_inputTexts.size() > 0) {
                 int randIdx = randomInt(0, (int) this->_inputTexts.size());
@@ -269,6 +275,7 @@ namespace fastbotx {
     void Preference::resolveBlackWidgets(const ElementPtr &rootXML, const std::string &activity) {
         // black widgets
         if (!this->_blackWidgetActions.empty()) {
+            std::vector<RectPtr> cachedRects;  // cache black widgets
             for (const CustomActionPtr &blackWidgetAction: this->_blackWidgetActions) {
                 if (!activity.empty() && blackWidgetAction->activity != activity)
                     continue;
@@ -296,8 +303,10 @@ namespace fastbotx {
                           (int) xpathElements.size());
                 }
                 xpathExistsInPage = xpath && !xpathElements.empty();
-                std::vector<RectPtr> cachedRects;  // cache black widgets
-
+               
+                BLOG("black widget %s, has bounds %d", xpath ? xpath->toString().c_str() : "none",
+                     (int) bounds.size());
+                BLOG("xpathExistsInPage %d, hasBoundingBox %d", xpathExistsInPage, hasBoundingBox);
                 if (xpathExistsInPage && !hasBoundingBox) {
                     BLOG("black widget xpath %s, has no bounds matched %d nodes",
                          xpath->toString().c_str(), (int) xpathElements.size());
@@ -327,26 +336,32 @@ namespace fastbotx {
                         }
                     }
                 }
-                this->_cachedBlackWidgetRects[activity] = cachedRects;
             }
+            this->_cachedBlackWidgetRects[activity] = cachedRects;
         }
     }
 
     bool Preference::checkPointIsInBlackRects(const std::string &activity, int pointX, int pointY) {
-        bool isInsideBlackList;
+        bool isInsideBlackList = false;
+        BLOG("Current activity: %s", activity.c_str());
+        for (const auto& pair : this->_cachedBlackWidgetRects) {
+            BLOG("Activity: %s, Rects: %d", pair.first.c_str(), pair.second.size());
+        }
+        
         auto iter = this->_cachedBlackWidgetRects.find(activity);
-        isInsideBlackList = iter != this->_cachedBlackWidgetRects.end();
-        if (isInsideBlackList) {
+        if (iter != this->_cachedBlackWidgetRects.end()) {
             const Point p(pointX, pointY);
-            for (const auto &rect: iter->second) {
+            // BLOG("check point [%d, %d] is black widgets ?", pointX, pointY);
+            for (const auto &rect : iter->second) {
+                BLOG("black widget rect: [%d, %d, %d, %d]", rect->left, rect->top, rect->right, rect->bottom);
                 if (rect->contains(p)) {
                     isInsideBlackList = true;
-                    break;
+                    break; // Found, no need to continue checking
                 }
             }
         }
         BLOG("check point [%d, %d] is %s in black widgets", pointX, pointY,
-             isInsideBlackList ? "" : "not");
+            isInsideBlackList ? "" : "not");
         return isInsideBlackList;
     }
 
@@ -537,6 +552,8 @@ namespace fastbotx {
             if (MaxRandomPickSTR == key_value[0]) {
                 BDLOG("set %s", MaxRandomPickSTR);
                 this->_randomInputText = ("true" == key_value[1]);
+                BLOG("random input text: %d", this->_randomInputText);
+                BLOG("key_value[1]: %s", key_value[1].c_str());
             } else if (InputFuzzSTR == key_value[0]) {
                 BDLOG("set %s", InputFuzzSTR);
                 this->_doInputFuzzing = ("true" == key_value[1]);
@@ -593,12 +610,14 @@ namespace fastbotx {
                     customAction->xpath = std::make_shared<Xpath>(xPathString);
                     customAction->text = getJsonValue<std::string>(action, "text", "");
                     customAction->clearText = getJsonValue<bool>(action, "clearText", false);
+                    customAction->editable = getJsonValue<bool>(action, "editable", false);
                     customAction->throttle = getJsonValue<int>(action, "throttle", 1000);
                     customAction->waitTime = getJsonValue<int>(action, "wait", 0);
                     customAction->adbInput = getJsonValue<bool>(action, "useAdbInput", false);
                     customAction->allowFuzzing = false;
+                    BLOG("action editable: %d", customAction->editable);
                     if (customAction->getActionType() == ActionType::SHELL_EVENT) {
-                        customAction->command = getJsonValue<std::string>(actions, "command", "");
+                        customAction->command = getJsonValue<std::string>(action, "command", "");
                     }
                     BLOG("loading action %s", xPathString.c_str());
                     customEvent->actions.push_back(customAction);
@@ -643,24 +662,30 @@ namespace fastbotx {
 
     void Preference::loadWhiteBlackList() {
         std::string contentBlack = fastbotx::Preference::loadFileContent(BlackListFilePath);
-        if (contentBlack.empty())
-            return;
-        std::vector<std::string> texts;
-        splitString(contentBlack, texts, '\n');
-        this->_blackList.swap(texts);
-        BLOG("blacklist :\n %s", contentBlack.c_str());
+        if (!contentBlack.empty()){
+            std::vector<std::string> texts;
+            splitString(contentBlack, texts, '\n');
+            this->_blackList.swap(texts);
+            BLOG("blacklist :\n %s", contentBlack.c_str());
+        }
+        
         std::string contentWhite = fastbotx::Preference::loadFileContent(WhiteListFilePath);
-        std::vector<std::string> textsw;
-        splitString(contentWhite, textsw, '\n');
-        this->_whiteList.swap(textsw);
-        BLOG("whitelist :\n %s", contentWhite.c_str());
+        if (!contentWhite.empty()){
+            std::vector<std::string> textsw;
+            splitString(contentWhite, textsw, '\n');
+            this->_whiteList.swap(textsw);
+            BLOG("whitelist :\n %s", contentWhite.c_str());
+        }
     }
 
 ///Load texts for input from specified file of designed text or file of fuzzing text
     void Preference::loadInputTexts() {
         // load specified designed text by tester
         std::string content = fastbotx::Preference::loadFileContent(InputTextConfigFilePath);
+        BLOG("loading input texts  : %s", InputTextConfigFilePath.c_str());
+        BLOG("input texts content: %s", content.c_str());
         if (!content.empty()) {
+            BLOG("input texts content is not empty");
             std::vector<std::string> texts;
             splitString(content, texts, '\n');
             this->_inputTexts.assign(texts.begin(), texts.end());

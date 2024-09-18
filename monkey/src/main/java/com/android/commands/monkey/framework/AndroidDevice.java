@@ -158,7 +158,7 @@ public class AndroidDevice {
     public static Rect getDisplayBounds() {
         android.view.Display display = DisplayManagerGlobal.getInstance().getRealDisplay(android.view.Display.DEFAULT_DISPLAY);
         Point size = new Point();
-        display.getSize(size);
+        display.getRealSize(size);
         Rect bounds = new Rect();
         bounds.top = 0;
         bounds.left = 0;
@@ -530,7 +530,9 @@ public class AndroidDevice {
     public static boolean sendIMEIntent(Intent intent) {
         try {
             if (checkAndSetInputMethod()) {
-                return broadcastIntent(intent);
+                Context ctx = ContextUtils.getSystemContext();
+                ctx.sendBroadcast(intent);
+                return true;
             }
             return false;
         } finally {

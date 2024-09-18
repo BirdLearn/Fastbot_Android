@@ -227,7 +227,8 @@ public class MonkeySourceApeNative implements MonkeyEventSource {
 
     private int appRestarted = 0;
     private boolean fullFuzzing = true;
-
+    
+    private String[] blockActions = new String[]{};
 
     public MonkeySourceApeNative(Random random, List<ComponentName> MainApps,
                                  long throttle, boolean randomizeThrottle, boolean permissionTargetSystem,
@@ -318,6 +319,11 @@ public class MonkeySourceApeNative implements MonkeyEventSource {
     public void setVerbose(int verbose) {
         mVerbose = verbose;
     }
+
+    public void setBlockActions(String[] blockActions) {
+        this.blockActions = blockActions;
+    }
+
 
     public int getStatusBarHeight() {
         if (this.statusBarHeight == 0) {
@@ -909,12 +915,21 @@ public class MonkeySourceApeNative implements MonkeyEventSource {
         if (topActivityName != null && !"".equals(stringOfGuiTree)) {
             try {
                 long rpc_start = System.currentTimeMillis();
-
                 Operate operate = AiClient.getAction(topActivityName.getClassName(), stringOfGuiTree);
                 operate.throttle += (int) this.mThrottle;
                 // For user specified actions, during executing, fuzzing is not allowed.
                 allowFuzzing = operate.allowFuzzing;
                 ActionType type = operate.act;
+               
+                // 如果 type.toString() 是在 mUseApeNativBlockActions 中,则重新生成 action
+                while (blockActions != null && Arrays.asList(blockActions).contains(type.toString())) {
+                    Logger.println("action type: " + type.toString() + " is blocked, re-generate action.");
+                    operate = AiClient.getAction(topActivityName.getClassName(), stringOfGuiTree);
+                    operate.throttle += (int) this.mThrottle;
+                    // For user specified actions, during executing, fuzzing is not allowed.
+                    allowFuzzing = operate.allowFuzzing;
+                    type = operate.act;
+                }
                 Logger.println("action type: " + type.toString());
                 Logger.println("rpc cost time: " + (System.currentTimeMillis() - rpc_start));
 
@@ -1020,7 +1035,6 @@ public class MonkeySourceApeNative implements MonkeyEventSource {
             fuzzingAction = generateFuzzingAction(fullFuzzing);
             generateEventsForAction(fuzzingAction);
         }
-
         Logger.println(" event time:" + Long.toString(System.currentTimeMillis() - start));
     }
 
